@@ -112,6 +112,41 @@ class ExtensionNormalizingFSResolver(SimpleFSResolver):
         format = self.extension_map.get(format, format)
         return (fp, format)
 
+# Fedora 3 Resolver to access datastream from datastreamStore
+class Fed3Resolver(_AbstractResolver):
+
+    def __init__(self, config):
+        self.config = config
+
+    # determine filename in fedora 3 datastreamStore
+    def determineFilename(self, ident):
+
+        logger.debug("attempting to split %s" % ident)
+
+        pid, dsid = ident.split(self.config['delimiter'])
+        logger.debug("Looking for %s %s" % (pid,dsid))
+        filename = "info:fedora/"+pid+"/"+dsid+"/"+dsid+".0" # assumes 0 version
+    
+        # urlencode filename and determine folder
+        hashed_filename = hashlib.md5(urllib.unquote(filename))
+        folder = hashed_filename.hexdigest()[0:2]
+        hashed_filename_quoted = urllib.quote_plus(filename)   
+        # fix underscores
+        hashed_filename_quoted = hashed_filename_quoted.replace('_','%5F')
+        logger.debug("Quoted filename: %s " % hashed_filename_quoted)
+
+        return "/".join( [self.config['fedora_datastream_store'],folder,hashed_filename_quoted] )
+
+    def is_resolvable(self, ident):
+        logger.debug("checking resolvability of %s" % ident)
+        return exists(self.determineFilename(ident))
+
+    def resolve(self, ident):
+        '''
+        Currently hardcoding jp2 as source format, but could query Fedora for mimetype with Eulfedora
+        '''
+        return (self.determineFilename(ident), 'jp2')
+
 class SimpleHTTPResolver(_AbstractResolver):
     '''
     Example resolver that one might use if image files were coming from
