@@ -112,6 +112,7 @@ class ExtensionNormalizingFSResolver(SimpleFSResolver):
         format = self.extension_map.get(format, format)
         return (fp, format)
 
+
 class SimpleHTTPResolver(_AbstractResolver):
     '''
     Example resolver that one might use if image files were coming from
@@ -177,11 +178,9 @@ class SimpleHTTPResolver(_AbstractResolver):
             return True
         else:
             fp = self._web_request_url(ident)
-
             with closing(requests.get(fp, stream=True, **self.request_options())) as r:
                 if r.status_code is 200:
                     return True
-                    
         return False
 
     def format_from_ident(self, ident, potential_format):
