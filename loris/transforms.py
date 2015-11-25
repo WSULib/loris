@@ -108,6 +108,11 @@ class _AbstractTransformer(object):
                 dither = Image.FLOYDSTEINBERG if self.dither_bitonal_images else Image.NONE
                 im = im.convert('1', dither=dither)
 
+            # account for bitonal images where im.mode != '1' and image_request.quality != 'bitonal'
+            elif len(im.getextrema()) > 1 and set(list(sum(im.getextrema(),()))) == {0,192}:
+                dither = Image.FLOYDSTEINBERG if self.dither_bitonal_images else Image.NONE
+                im = im.convert('1', dither=dither)
+
         if image_request.format == 'jpg':
             # see http://pillow.readthedocs.org/en/latest/handbook/image-file-formats.html#jpeg
             im.save(target_fp, quality=90)
