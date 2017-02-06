@@ -66,7 +66,7 @@ class ImageInfo(object):
         self.protocol = PROTOCOL
 
     @staticmethod
-    def from_image_file(uri, src_img_fp, src_format, formats=[]):
+    def from_image_file(uri, src_img_fp, src_format, formats=[], max_size_above_full=200):
         '''
         Args:
             ident (str): The URI for the image.
@@ -82,7 +82,9 @@ class ImageInfo(object):
         new_inst.tiles = []
         new_inst.sizes = None
         new_inst.scaleFactors = None
-        local_profile = {'formats' : formats, 'supports' : OPTIONAL_FEATURES}
+        local_profile = {'formats' : formats, 'supports' : OPTIONAL_FEATURES[:]}
+        if max_size_above_full == 0 or max_size_above_full > 100:
+            local_profile['supports'].append('sizeAboveFull')
         new_inst.profile = [ COMPLIANCE, local_profile ]
 
         logger.debug('Source Format: %s' % (src_format,))
@@ -94,7 +96,7 @@ class ImageInfo(object):
         elif src_format  in ('jpg','tif','png'):
             new_inst._extract_with_pillow(src_img_fp)
         else:
-            m = 'Didn\'t get a source format, or at least one we recognize ()' % (src_format,)
+            m = 'Didn\'t get a source format, or at least one we recognize ("%s")' % src_format
             raise ImageInfoException(http_status=500, message=m)
 
         return new_inst
@@ -142,11 +144,19 @@ class ImageInfo(object):
 
         scaleFactors = []
 
+        #TODO use context manager so it's automatically closed
         jp2 = open(fp, 'rb')
+
+        #check that this is a jp2 file
+        initial_bytes = jp2.read(24)
+        if (not initial_bytes[:12] == '\x00\x00\x00\x0cjP  \r\n\x87\n') or \
+            (not initial_bytes[16:] == 'ftypjp2 '):
+            jp2.close()
+            raise ImageInfoException(http_status=500, message='Invalid JP2 file')
+
+        #grab width and height
+        window = deque([], 4)
         b = jp2.read(1)
-
-        window =  deque([], 4)
-
         while ''.join(window) != 'ihdr':
             b = jp2.read(1)
             c = struct.unpack('c', b)[0]
@@ -426,6 +436,8 @@ class InfoCache(object):
             except OSError as e: # this happens once and a while; not sure why
                 if e.errno == errno.EEXIST:
                     pass
+                else:
+                    raise
 
         with open(info_fp, 'w') as f:
             f.write(info.to_json())
